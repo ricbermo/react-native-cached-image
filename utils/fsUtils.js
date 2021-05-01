@@ -1,26 +1,29 @@
-"use strict"
+"use strict";
 
-const _ = require("lodash")
+const _ = require("lodash");
 
-const RNFetchBlob = require("rn-fetch-blob").default
+const RNFetchBlob = require("react-native-blob-util").default;
 
-const { fs } = RNFetchBlob
+const { fs } = RNFetchBlob;
 
-const activeDownloads = {}
+const activeDownloads = {};
 
 function getDirPath(path) {
   // if path is a file (has ext) remove it
-  if (path.charAt(path.length - 4) === "." || path.charAt(path.length - 5) === ".") {
-    return _.initial(path.split("/")).join("/")
+  if (
+    path.charAt(path.length - 4) === "." ||
+    path.charAt(path.length - 5) === "."
+  ) {
+    return _.initial(path.split("/")).join("/");
   }
-  return path
+  return path;
 }
 
 function ensurePath(path) {
-  const dirPath = getDirPath(path)
+  const dirPath = getDirPath(path);
   return fs
     .isDir(dirPath)
-    .then(isDir => {
+    .then((isDir) => {
       if (!isDir) {
         return (
           fs
@@ -28,42 +31,45 @@ function ensurePath(path) {
             // check if dir has indeed been created because
             // there's no exception on incorrect user-defined paths (?)...
             .then(() => fs.isDir(dirPath))
-            .then(isDir => {
+            .then((isDir) => {
               if (!isDir) {
-                throw new Error("Invalid cacheLocation")
+                throw new Error("Invalid cacheLocation");
               }
             })
-        )
+        );
       }
     })
-    .catch(err => {
-      const errorMessage = err.message.toLowerCase()
+    .catch((err) => {
+      const errorMessage = err.message.toLowerCase();
       // ignore folder already exists errors
-      if (errorMessage.includes("already exists") && (errorMessage.includes("folder") || errorMessage.includes("directory"))) {
-        return
+      if (
+        errorMessage.includes("already exists") &&
+        (errorMessage.includes("folder") || errorMessage.includes("directory"))
+      ) {
+        return;
       }
 
-      return Promise.reject(err)
-    })
+      return Promise.reject(err);
+    });
 }
 
 function collectFilesInfo(basePath) {
   return fs
     .stat(basePath)
-    .then(info => {
+    .then((info) => {
       if (info.type === "file") {
-        return [info]
+        return [info];
       }
-      return fs.ls(basePath).then(files => {
-        const promises = _.map(files, file => {
-          return collectFilesInfo(`${basePath}/${file}`)
-        })
-        return Promise.all(promises)
-      })
+      return fs.ls(basePath).then((files) => {
+        const promises = _.map(files, (file) => {
+          return collectFilesInfo(`${basePath}/${file}`);
+        });
+        return Promise.all(promises);
+      });
     })
-    .catch(err => {
-      return []
-    })
+    .catch((err) => {
+      return [];
+    });
 }
 
 /**
@@ -75,7 +81,7 @@ module.exports = {
    * @returns {String}
    */
   getCacheDir() {
-    return fs.dirs.CacheDir + "/imagesCacheDir"
+    return fs.dirs.CacheDir + "/imagesCacheDir";
   },
 
   /**
@@ -92,48 +98,51 @@ module.exports = {
     // use toFile as the key as is was created using the cacheKey
     if (!_.has(activeDownloads, toFile)) {
       // using a temporary file, if the download is accidentally interrupted, it will not produce a disabled file
-      const tmpFile = toFile + ".tmp"
+      const tmpFile = toFile + ".tmp";
       // create an active download for this file
       activeDownloads[toFile] = ensurePath(toFile).then(() =>
         RNFetchBlob.config({
           path: tmpFile,
         })
           .fetch("GET", fromUrl, headers)
-          .then(res => {
+          .then((res) => {
             if (res.respInfo.status === 304) {
-              return Promise.resolve(toFile)
+              return Promise.resolve(toFile);
             }
-            let status = Math.floor(res.respInfo.status / 100)
+            let status = Math.floor(res.respInfo.status / 100);
             if (status !== 2) {
               // TODO - log / return error?
-              return Promise.reject()
+              return Promise.reject();
             }
 
-            return RNFetchBlob.fs.stat(tmpFile).then(fileStats => {
+            return RNFetchBlob.fs.stat(tmpFile).then((fileStats) => {
               // Verify if the content was fully downloaded!
-              if (res.respInfo.headers["Content-Length"] && res.respInfo.headers["Content-Length"] != fileStats.size) {
-                return Promise.reject()
+              if (
+                res.respInfo.headers["Content-Length"] &&
+                res.respInfo.headers["Content-Length"] != fileStats.size
+              ) {
+                return Promise.reject();
               }
 
               // the download is complete and rename the temporary file
-              return fs.mv(tmpFile, toFile)
-            })
+              return fs.mv(tmpFile, toFile);
+            });
           })
-          .catch(error => {
+          .catch((error) => {
             // cleanup. will try re-download on next CachedImage mount.
-            this.deleteFile(tmpFile)
-            delete activeDownloads[toFile]
-            return Promise.reject("Download failed")
+            this.deleteFile(tmpFile);
+            delete activeDownloads[toFile];
+            return Promise.reject("Download failed");
           })
           .then(() => {
             // cleanup
-            this.deleteFile(tmpFile)
-            delete activeDownloads[toFile]
-            return toFile
-          }),
-      )
+            this.deleteFile(tmpFile);
+            delete activeDownloads[toFile];
+            return toFile;
+          })
+      );
     }
-    return activeDownloads[toFile]
+    return activeDownloads[toFile];
   },
 
   /**
@@ -145,11 +154,11 @@ module.exports = {
   deleteFile(filePath) {
     return fs
       .stat(filePath)
-      .then(res => res && res.type === "file")
-      .then(exists => exists && fs.unlink(filePath))
-      .catch(err => {
+      .then((res) => res && res.type === "file")
+      .then((exists) => exists && fs.unlink(filePath))
+      .catch((err) => {
         // swallow error to always resolve
-      })
+      });
   },
 
   /**
@@ -159,7 +168,7 @@ module.exports = {
    * @returns {Promise}
    */
   copyFile(fromFile, toFile) {
-    return ensurePath(toFile).then(() => fs.cp(fromFile, toFile))
+    return ensurePath(toFile).then(() => fs.cp(fromFile, toFile));
   },
 
   /**
@@ -170,9 +179,9 @@ module.exports = {
   cleanDir(dirPath) {
     return fs
       .isDir(dirPath)
-      .then(isDir => isDir && fs.unlink(dirPath))
+      .then((isDir) => isDir && fs.unlink(dirPath))
       .catch(() => {})
-      .then(() => ensurePath(dirPath))
+      .then(() => ensurePath(dirPath));
   },
 
   /**
@@ -183,24 +192,24 @@ module.exports = {
   getDirInfo(dirPath) {
     return fs
       .isDir(dirPath)
-      .then(isDir => {
+      .then((isDir) => {
         if (isDir) {
-          return collectFilesInfo(dirPath)
+          return collectFilesInfo(dirPath);
         } else {
-          return Promise.reject("Dir does not exists")
+          return Promise.reject("Dir does not exists");
         }
       })
-      .then(filesInfo => {
-        const files = _.flattenDeep(filesInfo)
-        const size = _.sumBy(files, "size")
+      .then((filesInfo) => {
+        const files = _.flattenDeep(filesInfo);
+        const size = _.sumBy(files, "size");
         return {
           files,
           size,
-        }
-      })
+        };
+      });
   },
 
   exists(path) {
-    return fs.exists(path)
+    return fs.exists(path);
   },
-}
+};
