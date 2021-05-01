@@ -55,6 +55,6 @@
     "url-parse": "^1.4.1"
   },
   "peerDependencies": {
-    "@react-native-community/netinfo": "^4.6.0"
+    "@react-native-community/netinfo": "^6.0.0"
   }
 }
